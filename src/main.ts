@@ -1,99 +1,98 @@
-import {App, Editor, MarkdownView, Modal, Notice, Plugin} from 'obsidian';
-import {DEFAULT_SETTINGS, MyPluginSettings, SampleSettingTab} from "./settings";
+import {Notice, Plugin} from "obsidian";
+import {DEFAULT_SETTINGS, TodoistMigrateSettings, TodoistMigrateSettingTab} from "./settings";
+import {migrateActiveFile, migrateVault} from "./migrator";
+import {MigrationResult} from "./types";
 
-// Remember to rename these classes and interfaces!
-
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
+export default class TodoistMigratePlugin extends Plugin {
+	settings: TodoistMigrateSettings;
 
 	async onload() {
 		await this.loadSettings();
 
-		// This creates an icon in the left ribbon.
-		this.addRibbonIcon('dice', 'Sample', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
+		this.addRibbonIcon("check-square", "Migrate todos to Todoist", async () => {
+			await this.runMigrateActiveFile();
 		});
 
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status bar text');
-
-		// This adds a simple command that can be triggered anywhere
 		this.addCommand({
-			id: 'open-modal-simple',
-			name: 'Open modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
-			}
+			id: "migrate-current-file",
+			name: "Migrate todos in current file to Todoist",
+			callback: async () => {
+				await this.runMigrateActiveFile();
+			},
 		});
-		// This adds an editor command that can perform some operation on the current editor instance
+
 		this.addCommand({
-			id: 'replace-selected',
-			name: 'Replace selected content',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
-				editor.replaceSelection('Sample editor command');
-			}
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-modal-complex',
-			name: 'Open modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
-
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
-				}
-				return false;
-			}
+			id: "migrate-vault",
+			name: "Migrate all todos in vault to Todoist",
+			callback: async () => {
+				await this.runMigrateVault();
+			},
 		});
 
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
-
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			new Notice("Click");
-		});
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
-
+		this.addSettingTab(new TodoistMigrateSettingTab(this.app, this));
 	}
 
-	onunload() {
+	private async runMigrateActiveFile() {
+		if (!this.validateApiToken()) return;
+
+		try {
+			const result = await migrateActiveFile(
+				this.app,
+				this.settings.todoistApiToken,
+				this.settings.defaultDueString,
+			);
+			this.showResultNotice(result);
+		} catch (e) {
+			new Notice(`Migration failed: ${e instanceof Error ? e.message : String(e)}`);
+		}
+	}
+
+	private async runMigrateVault() {
+		if (!this.validateApiToken()) return;
+
+		try {
+			const result = await migrateVault(
+				this.app,
+				this.settings.todoistApiToken,
+				this.settings.defaultDueString,
+			);
+			this.showResultNotice(result);
+		} catch (e) {
+			new Notice(`Migration failed: ${e instanceof Error ? e.message : String(e)}`);
+		}
+	}
+
+	private validateApiToken(): boolean {
+		if (!this.settings.todoistApiToken) {
+			new Notice("Todoist API token not configured. Go to settings → Todoist migrate.");
+			return false;
+		}
+		return true;
+	}
+
+	private showResultNotice(result: MigrationResult) {
+		const parts: string[] = [];
+		if (result.created > 0) parts.push(`${result.created} task(s) migrated`);
+		if (result.skippedDuplicate > 0) parts.push(`${result.skippedDuplicate} duplicate(s) skipped`);
+		if (result.skippedFrontmatter > 0) parts.push(`${result.skippedFrontmatter} file(s) opted out`);
+		if (result.errors.length > 0) parts.push(`${result.errors.length} error(s)`);
+
+		if (parts.length === 0) {
+			new Notice("No todos found to migrate.");
+		} else {
+			new Notice(parts.join(", "));
+		}
+
+		if (result.errors.length > 0) {
+			console.error("Todoist migration errors:", result.errors);
+		}
 	}
 
 	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData() as Partial<MyPluginSettings>);
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData() as Partial<TodoistMigrateSettings>);
 	}
 
 	async saveSettings() {
 		await this.saveData(this.settings);
-	}
-}
-
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
-	}
-
-	onOpen() {
-		let {contentEl} = this;
-		contentEl.setText('Woah!');
-	}
-
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
 	}
 }

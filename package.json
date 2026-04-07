@@ -1,7 +1,7 @@
 {
-	"name": "obsidian-sample-plugin",
-	"version": "1.0.0",
-	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+	"name": "obsidian-todoist-migrate",
+	"version": "0.1.0",
+	"description": "Migrate TODO items from markdown notes to Todoist",
 	"main": "main.js",
 	"type": "module",
 	"scripts": {

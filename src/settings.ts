@@ -1,35 +1,52 @@
 import {App, PluginSettingTab, Setting} from "obsidian";
-import MyPlugin from "./main";
+import type TodoistMigratePlugin from "./main";
 
-export interface MyPluginSettings {
-	mySetting: string;
+export interface TodoistMigrateSettings {
+	todoistApiToken: string;
+	defaultDueString: string;
 }
 
-export const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
-}
+export const DEFAULT_SETTINGS: TodoistMigrateSettings = {
+	todoistApiToken: "",
+	defaultDueString: "Today",
+};
 
-export class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
+export class TodoistMigrateSettingTab extends PluginSettingTab {
+	plugin: TodoistMigratePlugin;
 
-	constructor(app: App, plugin: MyPlugin) {
+	constructor(app: App, plugin: TodoistMigratePlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
 
 	display(): void {
 		const {containerEl} = this;
-
 		containerEl.empty();
 
 		new Setting(containerEl)
-			.setName('Settings #1')
-			.setDesc('It\'s a secret')
+			.setName("Todoist migration")
+			.setHeading();
+
+		new Setting(containerEl)
+			.setName("Todoist API token")
+			.setDesc("Get your token from settings → integrations → developer in the Todoist app.")
 			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue(this.plugin.settings.mySetting)
+				.setPlaceholder("Enter your Todoist API token")
+				.setValue(this.plugin.settings.todoistApiToken)
+				.then(t => t.inputEl.type = "password")
 				.onChange(async (value) => {
-					this.plugin.settings.mySetting = value;
+					this.plugin.settings.todoistApiToken = value.trim();
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName("Default due date")
+			.setDesc("Natural language due date for created tasks (e.g. \"today\", \"tomorrow\", \"next monday\"). Leave empty for no due date.")
+			.addText(text => text
+				.setPlaceholder("Today")
+				.setValue(this.plugin.settings.defaultDueString)
+				.onChange(async (value) => {
+					this.plugin.settings.defaultDueString = value.trim();
 					await this.plugin.saveSettings();
 				}));
 	}
