@@ -31,3 +31,60 @@ describe("computeTaskHash", () => {
 		expect(tight).toBe(spaced);
 	});
 });
+
+describe("parseTasks", () => {
+	it("extracts a simple todo", async () => {
+		const tasks = await parseTasks("- [ ] Buy milk");
+		expect(tasks).toHaveLength(1);
+		expect(tasks[0]!.task).toBe("Buy milk");
+		expect(tasks[0]!.lineNumber).toBe(0);
+	});
+
+	it("extracts multiple todos", async () => {
+		const content = "- [ ] First\n- [ ] Second\n- [ ] Third";
+		const tasks = await parseTasks(content);
+		expect(tasks).toHaveLength(3);
+	});
+
+	it("ignores completed todos", async () => {
+		const content = "- [x] Done\n- [ ] Not done";
+		const tasks = await parseTasks(content);
+		expect(tasks).toHaveLength(1);
+		expect(tasks[0]!.task).toBe("Not done");
+	});
+
+	it("ignores non-todo lines", async () => {
+		const content = "# Heading\nSome text\n- [ ] A task\n- A plain list item";
+		const tasks = await parseTasks(content);
+		expect(tasks).toHaveLength(1);
+	});
+
+	it("handles indented todos", async () => {
+		const tasks = await parseTasks("  - [ ] Indented task");
+		expect(tasks).toHaveLength(1);
+		expect(tasks[0]!.task).toBe("Indented task");
+	});
+
+	it("strips # and @ from task text", async () => {
+		const tasks = await parseTasks("- [ ] Fix #bug and notify @alice");
+		expect(tasks).toHaveLength(1);
+		expect(tasks[0]!.task).toBe("Fix bug and notify alice");
+	});
+
+	it("returns empty array for no todos", async () => {
+		const tasks = await parseTasks("Just a regular note\nWith no todos");
+		expect(tasks).toHaveLength(0);
+	});
+
+	it("returns empty array for empty string", async () => {
+		const tasks = await parseTasks("");
+		expect(tasks).toHaveLength(0);
+	});
+
+	it("tracks correct line numbers", async () => {
+		const content = "# Title\n\n- [ ] First\n\n- [ ] Second";
+		const tasks = await parseTasks(content);
+		expect(tasks[0]!.lineNumber).toBe(2);
+		expect(tasks[1]!.lineNumber).toBe(4);
+	});
+});
