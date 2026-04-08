@@ -119,3 +119,49 @@ describe("isTodoistEnabled", () => {
 		expect(isTodoistEnabled(content)).toBe(false);
 	});
 });
+
+describe("buildMigratedLine", () => {
+	it("rewrites a basic todo line", () => {
+		const result = buildMigratedLine(
+			"- [ ] Buy milk",
+			"Buy milk",
+			"https://todoist.com/showTask?id=123",
+		);
+		expect(result).toBe(
+			"- [→] ~~Buy milk~~ [(This Task Migrated to Todoist)](https://todoist.com/showTask?id=123)",
+		);
+	});
+
+	it("preserves indentation", () => {
+		const result = buildMigratedLine(
+			"  - [ ] Indented task",
+			"Indented task",
+			"https://todoist.com/showTask?id=456",
+		);
+		expect(result).toContain("  - [→]");
+	});
+
+	it("replaces checkbox space with arrow", () => {
+		const result = buildMigratedLine(
+			"- [ ] Some task",
+			"Some task",
+			"https://example.com",
+		);
+		expect(result).toMatch(/^- \[→\]/);
+	});
+
+	it("wraps task text in strikethrough", () => {
+		const result = buildMigratedLine(
+			"- [ ] My task",
+			"My task",
+			"https://example.com",
+		);
+		expect(result).toContain("~~My task~~");
+	});
+
+	it("includes Todoist link", () => {
+		const url = "https://todoist.com/showTask?id=789";
+		const result = buildMigratedLine("- [ ] Task", "Task", url);
+		expect(result).toContain(`[(This Task Migrated to Todoist)](${url})`);
+	});
+});
