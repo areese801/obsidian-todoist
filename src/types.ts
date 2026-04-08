@@ -17,5 +17,6 @@ export interface MigrationResult {
 	created: number;
 	skippedDuplicate: number;
 	skippedFrontmatter: number;
+	skippedTooRecent: number;
 	errors: string[];
 }

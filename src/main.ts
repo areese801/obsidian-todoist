@@ -5,6 +5,8 @@ import {MigrationResult} from "./types";
 
 export default class TodoistMigratePlugin extends Plugin {
 	settings: TodoistMigrateSettings;
+	private autoSyncIntervalId: number | null = null;
+	private autoSyncRunning = false;
 
 	async onload() {
 		await this.loadSettings();
@@ -30,6 +32,7 @@ export default class TodoistMigratePlugin extends Plugin {
 		});
 
 		this.addSettingTab(new TodoistMigrateSettingTab(this.app, this));
+		this.startAutoSync();
 	}
 
 	private async runMigrateActiveFile() {
@@ -70,11 +73,60 @@ export default class TodoistMigratePlugin extends Plugin {
 		return true;
 	}
 
+	private startAutoSync() {
+		if (!this.settings.autoSyncEnabled) return;
+		if (!this.settings.todoistApiToken) return;
+
+		const intervalMs = this.settings.autoSyncIntervalMinutes * 60 * 1000;
+		const thresholdMs = this.settings.fileAgeThresholdSeconds * 1000;
+
+		const id = window.setInterval(() => {
+			void this.runAutoSync(thresholdMs);
+		}, intervalMs);
+
+		this.autoSyncIntervalId = id;
+		this.registerInterval(id);
+	}
+
+	private async runAutoSync(thresholdMs: number) {
+		if (this.autoSyncRunning) return;
+		this.autoSyncRunning = true;
+		try {
+			const result = await migrateVault(
+				this.app,
+				this.settings.todoistApiToken,
+				this.settings.defaultDueString,
+				thresholdMs,
+				true,
+			);
+			if (result.created > 0 || result.errors.length > 0) {
+				this.showResultNotice(result);
+			}
+		} catch (e) {
+			console.error("Todoist auto-sync failed:", e);
+		} finally {
+			this.autoSyncRunning = false;
+		}
+	}
+
+	private stopAutoSync() {
+		if (this.autoSyncIntervalId !== null) {
+			window.clearInterval(this.autoSyncIntervalId);
+			this.autoSyncIntervalId = null;
+		}
+	}
+
+	restartAutoSync() {
+		this.stopAutoSync();
+		this.startAutoSync();
+	}
+
 	private showResultNotice(result: MigrationResult) {
 		const parts: string[] = [];
 		if (result.created > 0) parts.push(`${result.created} task(s) migrated`);
 		if (result.skippedDuplicate > 0) parts.push(`${result.skippedDuplicate} duplicate(s) skipped`);
 		if (result.skippedFrontmatter > 0) parts.push(`${result.skippedFrontmatter} file(s) opted out`);
+		if (result.skippedTooRecent > 0) parts.push(`${result.skippedTooRecent} file(s) skipped (too recent)`);
 		if (result.errors.length > 0) parts.push(`${result.errors.length} error(s)`);
 
 		if (parts.length === 0) {

@@ -14,7 +14,7 @@ export async function migrateFile(
 	existingTasks: TodoistTask[],
 	existingHashes: Set<string>,
 ): Promise<MigrationResult> {
-	const result: MigrationResult = {created: 0, skippedDuplicate: 0, skippedFrontmatter: 0, errors: []};
+	const result: MigrationResult = {created: 0, skippedDuplicate: 0, skippedFrontmatter: 0, skippedTooRecent: 0, errors: []};
 
 	let content = await app.vault.read(file);
 
@@ -86,7 +86,7 @@ export async function migrateActiveFile(
 ): Promise<MigrationResult> {
 	const file = app.workspace.getActiveFile();
 	if (!file || file.extension !== "md") {
-		return {created: 0, skippedDuplicate: 0, skippedFrontmatter: 0, errors: ["No active markdown file"]};
+		return {created: 0, skippedDuplicate: 0, skippedFrontmatter: 0, skippedTooRecent: 0, errors: ["No active markdown file"]};
 	}
 
 	new Notice("Fetching existing Todoist tasks\u2026");
@@ -103,10 +103,14 @@ export async function migrateVault(
 	app: App,
 	apiToken: string,
 	dueString: string,
+	fileAgeThresholdMs: number = 0,
+	silent: boolean = false,
 ): Promise<MigrationResult> {
-	const totals: MigrationResult = {created: 0, skippedDuplicate: 0, skippedFrontmatter: 0, errors: []};
+	const totals: MigrationResult = {created: 0, skippedDuplicate: 0, skippedFrontmatter: 0, skippedTooRecent: 0, errors: []};
 
-	new Notice("Fetching existing Todoist tasks\u2026");
+	if (!silent) {
+		new Notice("Fetching existing Todoist tasks\u2026");
+	}
 	const existingTasks = await getActiveTasks(apiToken);
 	const existingHashes = await buildHashSet(existingTasks);
 
@@ -114,14 +118,23 @@ export async function migrateVault(
 	let processed = 0;
 
 	for (const file of files) {
+		if (fileAgeThresholdMs > 0) {
+			const age = Date.now() - file.stat.mtime;
+			if (age < fileAgeThresholdMs) {
+				totals.skippedTooRecent++;
+				continue;
+			}
+		}
+
 		const result = await migrateFile(app, file, apiToken, dueString, existingTasks, existingHashes);
 		totals.created += result.created;
 		totals.skippedDuplicate += result.skippedDuplicate;
 		totals.skippedFrontmatter += result.skippedFrontmatter;
+		totals.skippedTooRecent += result.skippedTooRecent;
 		totals.errors.push(...result.errors);
 		processed++;
 
-		if (processed % 50 === 0) {
+		if (!silent && processed % 50 === 0) {
 			new Notice(`Processing... ${processed}/${files.length} files`);
 		}
 	}
