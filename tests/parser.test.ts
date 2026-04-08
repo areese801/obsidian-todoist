@@ -88,3 +88,34 @@ describe("parseTasks", () => {
 		expect(tasks[1]!.lineNumber).toBe(4);
 	});
 });
+
+describe("isTodoistEnabled", () => {
+	it("returns true when no frontmatter", () => {
+		expect(isTodoistEnabled("# Just a heading\nSome content")).toBe(true);
+	});
+
+	it("returns true when frontmatter has no todoist key", () => {
+		const content = "---\ntitle: My Note\ntags: [foo]\n---\nContent";
+		expect(isTodoistEnabled(content)).toBe(true);
+	});
+
+	it("returns true when todoist: true", () => {
+		const content = "---\ntodoist: true\n---\nContent";
+		expect(isTodoistEnabled(content)).toBe(true);
+	});
+
+	it("returns false when todoist: false", () => {
+		const content = "---\ntodoist: false\n---\nContent";
+		expect(isTodoistEnabled(content)).toBe(false);
+	});
+
+	it("is case-insensitive for the value", () => {
+		const content = "---\ntodoist: False\n---\nContent";
+		expect(isTodoistEnabled(content)).toBe(false);
+	});
+
+	it("handles todoist key with extra whitespace", () => {
+		const content = "---\ntodoist:   false  \n---\nContent";
+		expect(isTodoistEnabled(content)).toBe(false);
+	});
+});
