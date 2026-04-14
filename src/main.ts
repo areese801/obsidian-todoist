@@ -1,4 +1,13 @@
-import {Notice, Plugin} from "obsidian";
+import {Notice, Plugin, addIcon, TFile} from "obsidian";
+
+const CHECKBOX_EXIT_ICON_ID = "todoist-migrate-checkbox-exit";
+const CHECKBOX_EXIT_ICON_SVG = `
+<g fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M65 42 V20 H15 V80 H65 V58" />
+  <path d="M32 50 H88" />
+  <path d="M72 34 L88 50 L72 66" />
+</g>
+`;
 import {DEFAULT_SETTINGS, TodoistMigrateSettings, TodoistMigrateSettingTab} from "./settings";
 import {migrateActiveFile, migrateVault} from "./migrator";
 import {MigrationResult} from "./types";
@@ -11,7 +20,9 @@ export default class TodoistMigratePlugin extends Plugin {
 	async onload() {
 		await this.loadSettings();
 
-		this.addRibbonIcon("check-square", "Migrate todos to Todoist", async () => {
+		addIcon(CHECKBOX_EXIT_ICON_ID, CHECKBOX_EXIT_ICON_SVG);
+
+		this.addRibbonIcon(CHECKBOX_EXIT_ICON_ID, "Migrate todos to Todoist", async () => {
 			await this.runMigrateActiveFile();
 		});
 
@@ -38,11 +49,13 @@ export default class TodoistMigratePlugin extends Plugin {
 	private async runMigrateActiveFile() {
 		if (!this.validateApiToken()) return;
 
+		const log = this.debugLog.bind(this);
 		try {
 			const result = await migrateActiveFile(
 				this.app,
 				this.settings.todoistApiToken,
 				this.settings.defaultDueString,
+				log,
 			);
 			this.showResultNotice(result);
 		} catch (e) {
@@ -53,11 +66,15 @@ export default class TodoistMigratePlugin extends Plugin {
 	private async runMigrateVault() {
 		if (!this.validateApiToken()) return;
 
+		const log = this.debugLog.bind(this);
 		try {
 			const result = await migrateVault(
 				this.app,
 				this.settings.todoistApiToken,
 				this.settings.defaultDueString,
+				0,
+				false,
+				log,
 			);
 			this.showResultNotice(result);
 		} catch (e) {
@@ -91,6 +108,7 @@ export default class TodoistMigratePlugin extends Plugin {
 	private async runAutoSync(thresholdMs: number) {
 		if (this.autoSyncRunning) return;
 		this.autoSyncRunning = true;
+		const log = this.debugLog.bind(this);
 		try {
 			const result = await migrateVault(
 				this.app,
@@ -98,6 +116,7 @@ export default class TodoistMigratePlugin extends Plugin {
 				this.settings.defaultDueString,
 				thresholdMs,
 				true,
+				log,
 			);
 			if (result.created > 0 || result.errors.length > 0) {
 				this.showResultNotice(result);
@@ -137,6 +156,20 @@ export default class TodoistMigratePlugin extends Plugin {
 
 		if (result.errors.length > 0) {
 			console.error("Todoist migration errors:", result.errors);
+		}
+	}
+
+	async debugLog(message: string) {
+		if (!this.settings.debugLogging) return;
+		const timestamp = new Date().toISOString();
+		const line = `${timestamp} ${message}\n`;
+		const logPath = "todoist-migrate-debug.md";
+		const existing = this.app.vault.getAbstractFileByPath(logPath);
+		if (existing instanceof TFile) {
+			const content = await this.app.vault.read(existing);
+			await this.app.vault.modify(existing, content + line);
+		} else {
+			await this.app.vault.create(logPath, `# Todoist Migrate Debug Log\n\n${line}`);
 		}
 	}
 

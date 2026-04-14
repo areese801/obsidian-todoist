@@ -6,6 +6,8 @@ import {MigrationResult, TodoistTask} from "./types";
 /**
  * Migrate TODO items from a single file to Todoist.
  */
+type DebugLogger = (message: string) => Promise<void>;
+
 export async function migrateFile(
 	app: App,
 	file: TFile,
@@ -13,6 +15,7 @@ export async function migrateFile(
 	dueString: string,
 	existingTasks: TodoistTask[],
 	existingHashes: Set<string>,
+	debugLog?: DebugLogger,
 ): Promise<MigrationResult> {
 	const result: MigrationResult = {created: 0, skippedDuplicate: 0, skippedFrontmatter: 0, skippedTooRecent: 0, errors: []};
 
@@ -48,6 +51,7 @@ export async function migrateFile(
 				task.task,
 				description,
 				dueString,
+				debugLog,
 			);
 
 			// Rewrite the line in the file content
@@ -83,6 +87,7 @@ export async function migrateActiveFile(
 	app: App,
 	apiToken: string,
 	dueString: string,
+	debugLog?: DebugLogger,
 ): Promise<MigrationResult> {
 	const file = app.workspace.getActiveFile();
 	if (!file || file.extension !== "md") {
@@ -90,10 +95,10 @@ export async function migrateActiveFile(
 	}
 
 	new Notice("Fetching existing Todoist tasks\u2026");
-	const existingTasks = await getActiveTasks(apiToken);
+	const existingTasks = await getActiveTasks(apiToken, debugLog);
 	const existingHashes = await buildHashSet(existingTasks);
 
-	return migrateFile(app, file, apiToken, dueString, existingTasks, existingHashes);
+	return migrateFile(app, file, apiToken, dueString, existingTasks, existingHashes, debugLog);
 }
 
 /**
@@ -105,13 +110,14 @@ export async function migrateVault(
 	dueString: string,
 	fileAgeThresholdMs: number = 0,
 	silent: boolean = false,
+	debugLog?: DebugLogger,
 ): Promise<MigrationResult> {
 	const totals: MigrationResult = {created: 0, skippedDuplicate: 0, skippedFrontmatter: 0, skippedTooRecent: 0, errors: []};
 
 	if (!silent) {
 		new Notice("Fetching existing Todoist tasks\u2026");
 	}
-	const existingTasks = await getActiveTasks(apiToken);
+	const existingTasks = await getActiveTasks(apiToken, debugLog);
 	const existingHashes = await buildHashSet(existingTasks);
 
 	const files = app.vault.getMarkdownFiles();
@@ -126,7 +132,7 @@ export async function migrateVault(
 			}
 		}
 
-		const result = await migrateFile(app, file, apiToken, dueString, existingTasks, existingHashes);
+		const result = await migrateFile(app, file, apiToken, dueString, existingTasks, existingHashes, debugLog);
 		totals.created += result.created;
 		totals.skippedDuplicate += result.skippedDuplicate;
 		totals.skippedFrontmatter += result.skippedFrontmatter;

@@ -7,6 +7,7 @@ export interface TodoistMigrateSettings {
 	autoSyncEnabled: boolean;
 	autoSyncIntervalMinutes: number;
 	fileAgeThresholdSeconds: number;
+	debugLogging: boolean;
 }
 
 export const DEFAULT_SETTINGS: TodoistMigrateSettings = {
@@ -15,6 +16,7 @@ export const DEFAULT_SETTINGS: TodoistMigrateSettings = {
 	autoSyncEnabled: false,
 	autoSyncIntervalMinutes: 5,
 	fileAgeThresholdSeconds: 60,
+	debugLogging: false,
 };
 
 export class TodoistMigrateSettingTab extends PluginSettingTab {
@@ -84,6 +86,16 @@ export class TodoistMigrateSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 						this.plugin.restartAutoSync();
 					}
+				}));
+
+		new Setting(containerEl)
+			.setName("Debug logging")
+			.setDesc("Write debug logs to todoist-migrate-debug.md in the vault root.")
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.debugLogging)
+				.onChange(async (value) => {
+					this.plugin.settings.debugLogging = value;
+					await this.plugin.saveSettings();
 				}));
 
 		new Setting(containerEl)
