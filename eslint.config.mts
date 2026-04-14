@@ -13,7 +13,10 @@ export default tseslint.config(
 				projectService: {
 					allowDefaultProject: [
 						'eslint.config.js',
-						'manifest.json'
+						'manifest.json',
+						'vitest.config.ts',
+						'tests/setup.ts',
+						'tests/parser.test.ts',
 					]
 				},
 				tsconfigRootDir: import.meta.dirname,
@@ -22,6 +25,18 @@ export default tseslint.config(
 		},
 	},
 	...obsidianmd.configs.recommended,
+	{
+		plugins: {obsidianmd},
+		rules: {
+			"obsidianmd/ui/sentence-case": ["error", {brands: ["Todoist"]}],
+		},
+	},
+	{
+		files: ["tests/**/*.ts", "vitest.config.ts"],
+		rules: {
+			"import/no-nodejs-modules": "off",
+		},
+	},
 	globalIgnores([
 		"node_modules",
 		"dist",
