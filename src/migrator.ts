@@ -8,6 +8,17 @@ import {MigrationResult, TodoistTask} from "./types";
  */
 type DebugLogger = (message: string) => Promise<void>;
 
+function isFileExcluded(filePath: string, excludedFolders: string): boolean {
+	if (!excludedFolders.trim()) return false;
+	const folders = excludedFolders.split(",").map(f => f.trim().replace(/\/+$/, "")).filter(f => f.length > 0);
+	for (const folder of folders) {
+		if (filePath.startsWith(folder + "/")) {
+			return true;
+		}
+	}
+	return false;
+}
+
 export async function migrateFile(
 	app: App,
 	file: TFile,
@@ -109,6 +120,7 @@ export async function migrateVault(
 	apiToken: string,
 	dueString: string,
 	fileAgeThresholdMs: number = 0,
+	excludedFolders: string = "",
 	silent: boolean = false,
 	debugLog?: DebugLogger,
 ): Promise<MigrationResult> {
@@ -124,6 +136,10 @@ export async function migrateVault(
 	let processed = 0;
 
 	for (const file of files) {
+		if (isFileExcluded(file.path, excludedFolders)) {
+			continue;
+		}
+
 		if (fileAgeThresholdMs > 0) {
 			const age = Date.now() - file.stat.mtime;
 			if (age < fileAgeThresholdMs) {

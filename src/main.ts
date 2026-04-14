@@ -73,6 +73,7 @@ export default class TodoistMigratePlugin extends Plugin {
 				this.settings.todoistApiToken,
 				this.settings.defaultDueString,
 				0,
+				this.settings.excludedFolders,
 				false,
 				log,
 			);
@@ -115,6 +116,7 @@ export default class TodoistMigratePlugin extends Plugin {
 				this.settings.todoistApiToken,
 				this.settings.defaultDueString,
 				thresholdMs,
+				this.settings.excludedFolders,
 				true,
 				log,
 			);

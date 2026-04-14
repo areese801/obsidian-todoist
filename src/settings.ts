@@ -7,6 +7,7 @@ export interface TodoistMigrateSettings {
 	autoSyncEnabled: boolean;
 	autoSyncIntervalMinutes: number;
 	fileAgeThresholdSeconds: number;
+	excludedFolders: string;
 	debugLogging: boolean;
 }
 
@@ -16,6 +17,7 @@ export const DEFAULT_SETTINGS: TodoistMigrateSettings = {
 	autoSyncEnabled: false,
 	autoSyncIntervalMinutes: 5,
 	fileAgeThresholdSeconds: 60,
+	excludedFolders: "",
 	debugLogging: false,
 };
 
@@ -55,6 +57,17 @@ export class TodoistMigrateSettingTab extends PluginSettingTab {
 				.setValue(this.plugin.settings.defaultDueString)
 				.onChange(async (value) => {
 					this.plugin.settings.defaultDueString = value.trim();
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName("Excluded folders")
+			.setDesc("Comma-separated folder paths to skip during vault-wide migration (e.g. \"Templates, Computer/Dagster\"). Subfolders are excluded automatically.")
+			.addTextArea(text => text
+				.setPlaceholder("Templates, Recipes")
+				.setValue(this.plugin.settings.excludedFolders)
+				.onChange(async (value) => {
+					this.plugin.settings.excludedFolders = value;
 					await this.plugin.saveSettings();
 				}));
 
