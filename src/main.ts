@@ -67,6 +67,7 @@ export default class TodoistMigratePlugin extends Plugin {
 		if (!this.validateApiToken()) return;
 
 		const log = this.debugLog.bind(this);
+		const dryRun = this.settings.dryRunMode;
 		try {
 			const result = await migrateVault(
 				this.app,
@@ -76,8 +77,13 @@ export default class TodoistMigratePlugin extends Plugin {
 				this.settings.excludedFolders,
 				false,
 				log,
+				dryRun,
 			);
-			this.showResultNotice(result);
+			if (dryRun) {
+				await this.writeDryRunReport(result);
+			} else {
+				this.showResultNotice(result);
+			}
 		} catch (e) {
 			new Notice(`Migration failed: ${e instanceof Error ? e.message : String(e)}`);
 		}
@@ -94,6 +100,7 @@ export default class TodoistMigratePlugin extends Plugin {
 	private startAutoSync() {
 		if (!this.settings.autoSyncEnabled) return;
 		if (!this.settings.todoistApiToken) return;
+		if (this.settings.dryRunMode) return;
 
 		const intervalMs = this.settings.autoSyncIntervalMinutes * 60 * 1000;
 		const thresholdMs = this.settings.fileAgeThresholdSeconds * 1000;
@@ -159,6 +166,41 @@ export default class TodoistMigratePlugin extends Plugin {
 		if (result.errors.length > 0) {
 			console.error("Todoist migration errors:", result.errors);
 		}
+	}
+
+	private async writeDryRunReport(result: MigrationResult) {
+		const lines: string[] = [
+			`# Todoist Migrate — Dry Run Report`,
+			``,
+			`Generated: ${new Date().toISOString()}`,
+			``,
+			`## Summary`,
+			`- **Would migrate**: ${result.created} task(s)`,
+			`- **Duplicates (already in Todoist)**: ${result.skippedDuplicate}`,
+			`- **Opted out (todoist: false)**: ${result.skippedFrontmatter}`,
+			``,
+		];
+
+		if (result.dryRunItems.length > 0) {
+			lines.push(`## Tasks that would be migrated`, ``);
+			for (const item of result.dryRunItems) {
+				lines.push(`- ${item}`);
+			}
+			lines.push(``);
+		}
+
+		lines.push(`> Disable **Dry run mode** in plugin settings to perform the actual migration.`, ``);
+
+		const content = lines.join("\n");
+		const reportPath = "todoist-migrate-dry-run.md";
+		const existing = this.app.vault.getAbstractFileByPath(reportPath);
+		if (existing instanceof TFile) {
+			await this.app.vault.modify(existing, content);
+		} else {
+			await this.app.vault.create(reportPath, content);
+		}
+
+		new Notice(`Dry run complete: ${result.created} task(s) would be migrated. See todoist-migrate-dry-run.md`);
 	}
 
 	async debugLog(message: string) {

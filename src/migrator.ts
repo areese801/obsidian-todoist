@@ -27,8 +27,9 @@ export async function migrateFile(
 	existingTasks: TodoistTask[],
 	existingHashes: Set<string>,
 	debugLog?: DebugLogger,
+	dryRun: boolean = false,
 ): Promise<MigrationResult> {
-	const result: MigrationResult = {created: 0, skippedDuplicate: 0, skippedFrontmatter: 0, skippedTooRecent: 0, errors: []};
+	const result: MigrationResult = {created: 0, skippedDuplicate: 0, skippedFrontmatter: 0, skippedTooRecent: 0, errors: [], dryRunItems: []};
 
 	let content = await app.vault.read(file);
 
@@ -39,6 +40,18 @@ export async function migrateFile(
 
 	const tasks = await parseTasks(content);
 	if (tasks.length === 0) return result;
+
+	if (dryRun) {
+		for (const task of tasks) {
+			if (existingHashes.has(task.taskMd5Hash)) {
+				result.skippedDuplicate++;
+			} else {
+				result.created++;
+				result.dryRunItems.push(`${file.path}: ${task.task}`);
+			}
+		}
+		return result;
+	}
 
 	const vaultName = app.vault.getName();
 	const noteName = file.path.replace(/\.md$/, "");
@@ -102,7 +115,7 @@ export async function migrateActiveFile(
 ): Promise<MigrationResult> {
 	const file = app.workspace.getActiveFile();
 	if (!file || file.extension !== "md") {
-		return {created: 0, skippedDuplicate: 0, skippedFrontmatter: 0, skippedTooRecent: 0, errors: ["No active markdown file"]};
+		return {created: 0, skippedDuplicate: 0, skippedFrontmatter: 0, skippedTooRecent: 0, errors: ["No active markdown file"], dryRunItems: []};
 	}
 
 	new Notice("Fetching existing Todoist tasks\u2026");
@@ -123,8 +136,9 @@ export async function migrateVault(
 	excludedFolders: string = "",
 	silent: boolean = false,
 	debugLog?: DebugLogger,
+	dryRun: boolean = false,
 ): Promise<MigrationResult> {
-	const totals: MigrationResult = {created: 0, skippedDuplicate: 0, skippedFrontmatter: 0, skippedTooRecent: 0, errors: []};
+	const totals: MigrationResult = {created: 0, skippedDuplicate: 0, skippedFrontmatter: 0, skippedTooRecent: 0, errors: [], dryRunItems: []};
 
 	if (!silent) {
 		new Notice("Fetching existing Todoist tasks\u2026");
@@ -148,12 +162,13 @@ export async function migrateVault(
 			}
 		}
 
-		const result = await migrateFile(app, file, apiToken, dueString, existingTasks, existingHashes, debugLog);
+		const result = await migrateFile(app, file, apiToken, dueString, existingTasks, existingHashes, debugLog, dryRun);
 		totals.created += result.created;
 		totals.skippedDuplicate += result.skippedDuplicate;
 		totals.skippedFrontmatter += result.skippedFrontmatter;
 		totals.skippedTooRecent += result.skippedTooRecent;
 		totals.errors.push(...result.errors);
+		totals.dryRunItems.push(...result.dryRunItems);
 		processed++;
 
 		if (!silent && processed % 50 === 0) {

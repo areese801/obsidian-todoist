@@ -8,6 +8,7 @@ export interface TodoistMigrateSettings {
 	autoSyncIntervalMinutes: number;
 	fileAgeThresholdSeconds: number;
 	excludedFolders: string;
+	dryRunMode: boolean;
 	debugLogging: boolean;
 }
 
@@ -18,6 +19,7 @@ export const DEFAULT_SETTINGS: TodoistMigrateSettings = {
 	autoSyncIntervalMinutes: 5,
 	fileAgeThresholdSeconds: 60,
 	excludedFolders: "",
+	dryRunMode: true,
 	debugLogging: false,
 };
 
@@ -61,6 +63,16 @@ export class TodoistMigrateSettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
+			.setName("Dry run mode")
+			.setDesc("When enabled, migration commands will preview what would be migrated without creating tasks or modifying files. Use this to identify folders or notes to exclude. Results are written to todoist-migrate-dry-run.md.")
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.dryRunMode)
+				.onChange(async (value) => {
+					this.plugin.settings.dryRunMode = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
 			.setName("Excluded folders")
 			.setDesc("Comma-separated folder paths to skip during vault-wide migration (e.g. \"Templates, Computer/Dagster\"). Subfolders are excluded automatically.")
 			.addTextArea(text => text
@@ -70,6 +82,11 @@ export class TodoistMigrateSettingTab extends PluginSettingTab {
 					this.plugin.settings.excludedFolders = value;
 					await this.plugin.saveSettings();
 				}));
+
+		new Setting(containerEl)
+			.setName("Per-file opt-out")
+			.setDesc("To exclude an individual file, add \"todoist: false\" to its YAML frontmatter. Files without this tag are included by default.")
+			.setDisabled(true);
 
 		new Setting(containerEl)
 			.setName("Auto-sync")

@@ -19,4 +19,5 @@ export interface MigrationResult {
 	skippedFrontmatter: number;
 	skippedTooRecent: number;
 	errors: string[];
+	dryRunItems: string[];
 }
