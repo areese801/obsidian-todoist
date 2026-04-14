@@ -1,90 +1,124 @@
-# Obsidian Sample Plugin
+# Todoist Migrate
 
-This is a sample plugin for Obsidian (https://obsidian.md).
+An Obsidian plugin that migrates TODO items from markdown notes to Todoist, leaving a linked placeholder behind.
 
-This project uses TypeScript to provide type checking and documentation.
-The repo depends on the latest plugin API (obsidian.d.ts) in TypeScript Definition format, which contains TSDoc comments describing what it does.
+When a task like `- [ ] Buy milk` is migrated, it becomes:
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open modal (simple)" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and output 'click' to the console.
-- Registers a global interval which logs 'setInterval' to the console.
-
-## First time developing plugins?
-
-Quick starting guide for new plugin devs:
-
-- Check if [someone already developed a plugin for what you want](https://obsidian.md/plugins)! There might be an existing plugin similar enough that you can partner up with.
-- Make a copy of this repo as a template with the "Use this template" button (login to GitHub if you don't see it).
-- Clone your repo to a local development folder. For convenience, you can place this folder in your `.obsidian/plugins/your-plugin-name` folder.
-- Install NodeJS, then run `npm i` in the command line under your repo folder.
-- Run `npm run dev` to compile your plugin from `main.ts` to `main.js`.
-- Make changes to `main.ts` (or create new `.ts` files). Those changes should be automatically compiled into `main.js`.
-- Reload Obsidian to load the new version of your plugin.
-- Enable plugin in settings window.
-- For updates to the Obsidian API run `npm update` in the command line under your repo folder.
-
-## Releasing new releases
-
-- Update your `manifest.json` with your new version number, such as `1.0.1`, and the minimum Obsidian version required for your latest release.
-- Update your `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of your plugin that's compatible.
-- Create new GitHub release using your new version number as the "Tag version". Use the exact version number, don't include a prefix `v`. See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
-- Upload the files `manifest.json`, `main.js`, `styles.css` as binary attachments. Note: The manifest.json file must be in two places, first the root path of your repository and also in the release.
-- Publish the release.
-
-> You can simplify the version bump process by running `npm version patch`, `npm version minor` or `npm version major` after updating `minAppVersion` manually in `manifest.json`.
-> The command will bump version in `manifest.json` and `package.json`, and add the entry for the new version to `versions.json`
-
-## Adding your plugin to the community plugin list
-
-- Check the [plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines).
-- Publish an initial version.
-- Make sure you have a `README.md` file in the root of your repo.
-- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add your plugin.
-
-## How to use
-
-- Clone this repo.
-- Make sure your NodeJS is at least v16 (`node --version`).
-- `npm i` or `yarn` to install dependencies.
-- `npm run dev` to start compilation in watch mode.
-
-## Manually installing the plugin
-
-- Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/your-plugin-id/`.
-
-## Improve code quality with eslint
-- [ESLint](https://eslint.org/) is a tool that analyzes your code to quickly find problems. You can run ESLint against your plugin to find common bugs and ways to improve your code. 
-- This project already has eslint preconfigured, you can invoke a check by running`npm run lint`
-- Together with a custom eslint [plugin](https://github.com/obsidianmd/eslint-plugin) for Obsidan specific code guidelines.
-- A GitHub action is preconfigured to automatically lint every commit on all branches.
-
-## Funding URL
-
-You can include funding URLs where people who use your plugin can financially support it.
-
-The simple way is to set the `fundingUrl` field to your link in your `manifest.json` file:
-
-```json
-{
-    "fundingUrl": "https://buymeacoffee.com"
-}
+```
+- [→] ~~Buy milk~~ [(This Task Migrated to Todoist)](https://app.todoist.com/app/task/123)
 ```
 
-If you have multiple URLs, you can also do:
+The task is created in Todoist with a backlink to the originating note.
 
-```json
-{
-    "fundingUrl": {
-        "Buy Me a Coffee": "https://buymeacoffee.com",
-        "GitHub Sponsor": "https://github.com/sponsors",
-        "Patreon": "https://www.patreon.com/"
-    }
-}
+## Features
+
+- **Single-file migration** — migrate TODOs from the active note via command palette or ribbon icon
+- **Vault-wide migration** — scan all markdown files and migrate TODOs in bulk
+- **Auto-sync heartbeat** — configurable timer (default 5 min) that automatically migrates new TODOs
+- **Dry run mode** — preview what would be migrated without creating tasks or modifying files (enabled by default)
+- **Deduplication** — tasks already in Todoist are skipped based on content hash
+- **Excluded folders** — skip entire folder trees during vault-wide migration
+- **Per-file opt-out** — add `todoist: false` to YAML frontmatter to skip individual notes
+- **File age threshold** — skip recently modified files to avoid migrating partially-typed TODOs
+- **Debug logging** — optional detailed API logging to a file in the vault
+
+## Setup
+
+### Prerequisites
+
+- [Obsidian](https://obsidian.md) v0.15.0+
+- Node.js 18+ (for building from source)
+- A [Todoist](https://todoist.com) account and API token
+
+### Install from source
+
+```bash
+git clone https://github.com/areese801/obsidian-todoist.git
+cd obsidian-todoist
+npm install
+npm run build
 ```
 
-## API Documentation
+Copy `main.js`, `manifest.json`, and `styles.css` to your vault:
 
-See https://docs.obsidian.md
+```bash
+mkdir -p <vault>/.obsidian/plugins/todoist-migrate
+cp main.js manifest.json styles.css <vault>/.obsidian/plugins/todoist-migrate/
+```
+
+Reload Obsidian and enable **Todoist Migrate** in Settings → Community plugins.
+
+### Configure
+
+1. Go to Settings → Todoist Migrate
+2. Paste your Todoist API token (get it from Todoist → Settings → Integrations → Developer)
+3. Review the default settings:
+   - **Dry run mode** is ON by default — migration commands will generate a preview report instead of creating tasks
+   - **Excluded folders** — comma-separated folder paths to skip (e.g. `_templates, Recipes`)
+   - **Auto-sync** is OFF by default
+   - **File age threshold** — 60 seconds (files modified more recently are skipped)
+
+## Usage
+
+### Commands
+
+Open the command palette (Cmd/Ctrl+P) to access:
+
+| Command | Description |
+|---------|-------------|
+| **Migrate todos in current file to Todoist** | Migrate TODOs from the active note |
+| **Migrate all todos in vault to Todoist** | Scan all markdown files and migrate TODOs |
+
+The ribbon icon (checkbox with arrow) triggers single-file migration on the active note.
+
+### Dry run mode
+
+When dry run mode is enabled (the default), vault-wide migration writes a report to `todoist-migrate-dry-run.md` in the vault root instead of creating tasks. Use this to:
+
+1. See which tasks would be migrated
+2. Identify folders or notes that should be excluded
+3. Verify your configuration before going live
+
+Disable dry run mode in settings when you're ready for actual migration.
+
+### Excluding notes
+
+**By folder** — add folder paths to the "Excluded folders" setting:
+```
+_templates, Computer/Dagster, Recipes
+```
+Subfolders are excluded automatically.
+
+**By frontmatter** — add `todoist: false` to a note's YAML frontmatter:
+```yaml
+---
+todoist: false
+---
+```
+
+### Auto-sync
+
+When enabled, the plugin scans the vault on a timer and migrates new TODOs automatically. Auto-sync is disabled while dry run mode is active.
+
+## Output files
+
+The plugin may create these files in your vault root:
+
+| File | Purpose | Created when |
+|------|---------|--------------|
+| `todoist-migrate-dry-run.md` | Preview report of tasks that would be migrated | Dry run mode is on and vault migration runs |
+| `todoist-migrate-debug.md` | API request/response debug log | Debug logging is enabled in settings |
+
+## Development
+
+```bash
+npm run dev          # watch mode
+npm run build        # production build
+npm test             # run vitest suite
+npm run test:watch   # vitest in watch mode
+npm run lint         # eslint
+```
+
+## License
+
+0-BSD
